@@ -7,6 +7,8 @@ import { PrismaAuthRepository } from './modules/auth/repositories/auth.repositor
 import type { AuthRepository } from './modules/auth/repositories/auth.repository.js';
 import { InMemoryAuthRepository } from './modules/auth/repositories/in-memory-auth.repository.js';
 import { createStellarRouter } from './modules/stellar/routes/stellar.routes.js';
+import { DistributionKillSwitch } from '@qyou/stellar';
+import { createStellarServices } from './shared/stellar/bootstrap.js';
 import type { StellarRepository } from './modules/stellar/repositories/stellar.repository.js';
 import { prisma } from './shared/database/prisma.js';
 import { errorHandler } from './shared/middleware/error-handler.js';
