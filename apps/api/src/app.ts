@@ -136,6 +136,65 @@ const openApiSpec = {
         },
       },
     },
+    '/api/v1/stellar/rewards': {
+      get: {
+        summary: "The caller's reward history, newest first",
+        description:
+          'Cursor-paginated and always scoped to the authenticated caller: there is no ' +
+          'parameter for reading another account. `nextCursor` is opaque — pass it back ' +
+          'as `cursor` to continue, and stop when it is null.',
+        tags: ['Stellar'],
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            name: 'limit',
+            in: 'query',
+            required: false,
+            schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+          },
+          {
+            name: 'cursor',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+            description: 'Value of `nextCursor` from the previous page.',
+          },
+        ],
+        responses: {
+          200: {
+            description: 'A page of rewards',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['items', 'nextCursor'],
+                  properties: {
+                    items: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        required: ['id', 'userId', 'amount', 'asset', 'reason', 'createdAt'],
+                        properties: {
+                          id: { type: 'string' },
+                          userId: { type: 'string' },
+                          amount: { type: 'string', description: 'Decimal string, 7 places' },
+                          asset: { type: 'string' },
+                          reason: { type: 'string' },
+                          createdAt: { type: 'integer' },
+                        },
+                      },
+                    },
+                    nextCursor: { type: 'string', nullable: true },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'Invalid limit or cursor' },
+          401: { description: 'Authentication required' },
+        },
+      },
+    },
   },
   components: {
     schemas: {

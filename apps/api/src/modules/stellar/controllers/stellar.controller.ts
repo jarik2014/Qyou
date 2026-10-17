@@ -51,4 +51,20 @@ export class StellarController {
       next(error);
     }
   };
+
+  /** `GET /stellar/rewards` — the caller's reward history, newest first (#1148). */
+  listRewards = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user?.id) {
+        throw new UnauthorizedError('Authentication required to read rewards.');
+      }
+      const page = await this.stellarService.listRewards(req.user.id, {
+        limit: req.query.limit === undefined ? undefined : String(req.query.limit),
+        cursor: req.query.cursor === undefined ? undefined : String(req.query.cursor),
+      });
+      res.status(200).json(page);
+    } catch (error) {
+      next(error);
+    }
+  };
 }

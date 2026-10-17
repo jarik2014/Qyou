@@ -2,7 +2,9 @@ import { WalletService } from '@qyou/stellar';
 import type { WalletAccount, WalletBalances } from '@qyou/stellar';
 import type { StellarRepository } from '../repositories/stellar.repository.js';
 import type {
+  ListRewardsQuery,
   LinkWalletInput,
+  RewardsPage,
   UnlinkWalletInput,
   WalletDetailsResponse,
   UnlinkWalletResponse,
@@ -15,6 +17,10 @@ import {
   UnauthorizedError,
 } from '../../../shared/errors/index.js';
 import { logger } from '../../../shared/logger/index.js';
+import { decodeRewardCursor } from '../repositories/stellar.repository.js';
+
+const DEFAULT_REWARDS_PAGE_SIZE = 20;
+const MAX_REWARDS_PAGE_SIZE = 100;
 
 export class StellarApiService {
   private readonly _repository: StellarRepository;
@@ -84,6 +90,37 @@ export class StellarApiService {
       wallet,
       balances,
     };
+  }
+
+  /**
+   * Reward history for one caller (#1148). Cursor pagination, newest first.
+   *
+   * The page is always scoped to ``userId``: there is no parameter that would
+   * let a caller read somebody else's rewards.
+   */
+  public async listRewards(userId: string, query: ListRewardsQuery): Promise<RewardsPage> {
+    const rawLimit = query.limit;
+    const limit = rawLimit === undefined ? DEFAULT_REWARDS_PAGE_SIZE : Number(rawLimit);
+    if (rawLimit !== undefined && rawLimit.trim() === '') {
+      throw new ValidationError('limit must be an integer between 1 and 100');
+    }
+
+    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_REWARDS_PAGE_SIZE) {
+      throw new ValidationError(
+        `limit must be an integer between 1 and ${MAX_REWARDS_PAGE_SIZE}`,
+      );
+    }
+
+    let cursor = null;
+    if (query.cursor !== undefined && query.cursor !== '') {
+      try {
+        cursor = decodeRewardCursor(String(query.cursor));
+      } catch {
+        throw new ValidationError('cursor is not a valid pagination cursor');
+      }
+    }
+
+    return this._repository.listRewards(userId, limit, cursor);
   }
 
   public async unlinkWallet(

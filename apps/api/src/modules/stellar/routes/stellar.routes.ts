@@ -22,5 +22,8 @@ export function createStellarRouter(deps: StellarRouterDependencies = {}): Route
   router.get('/wallet', requireAuth, controller.getWallet);
   router.delete('/wallet', requireAuth, controller.unlinkWallet);
 
+  // #1148: reward history for the caller, cursor-paginated.
+  router.get('/rewards', requireAuth, controller.listRewards);
+
   return router;
 }
