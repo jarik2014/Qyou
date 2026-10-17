@@ -6,6 +6,9 @@ import { UnauthorizedError } from '../errors/index.js';
 interface AccessTokenPayload {
   sub: string;
   email: string;
+  /** Виставляється `jsonwebtoken` при підписі; вживається для перевірки свіжості сесії. */
+  iat?: number;
+  exp?: number;
 }
 
 export function requireAuth(req: Request, _res: Response, next: NextFunction): void {
@@ -19,7 +22,7 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
 
   try {
     const payload = jwt.verify(token, env.JWT_SECRET) as AccessTokenPayload;
-    req.user = { id: payload.sub, email: payload.email };
+    req.user = { id: payload.sub, email: payload.email, authTime: payload.iat };
     next();
   } catch {
     throw new UnauthorizedError('Invalid or expired token.');

@@ -19,6 +19,8 @@ const envSchema = z.object({
     .transform((val) => val.split(',').map((s) => s.trim())),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+  // #1154: скільки хвилин сесія вважається «свіжою» для відвʼязки гаманця.
+  WALLET_UNLINK_REAUTH_MINUTES: z.coerce.number().int().positive().default(10),
 });
 
 const result = envSchema.safeParse(process.env);

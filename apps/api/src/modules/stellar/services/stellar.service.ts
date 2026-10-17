@@ -15,6 +15,7 @@ import {
   UnauthorizedError,
 } from '../../../shared/errors/index.js';
 import { logger } from '../../../shared/logger/index.js';
+import type { ReauthEvidence } from '../../../shared/middleware/recent-auth.js';
 
 export class StellarApiService {
   private readonly _repository: StellarRepository;
@@ -89,10 +90,21 @@ export class StellarApiService {
   public async unlinkWallet(
     userId: string,
     input: UnlinkWalletInput,
+    reauth?: ReauthEvidence,
   ): Promise<UnlinkWalletResponse> {
-    if (!input.password && !input.reauthConfirmed) {
+    // #1154: доказ приходить лише від requireRecentAuth (перевірений пароль або
+    // свіжий токен). Клієнтський прапорець `reauthConfirmed` більше не рахується.
+    if (!reauth) {
       throw new UnauthorizedError(
-        'Re-authentication required: must provide password or verified confirmation to unlink wallet.',
+        'Re-authentication required: provide your password or a session issued in the last few minutes.',
+      );
+    }
+
+    // Доказ і тіло мусять узгоджуватись: парольний шлях без пароля в запиті
+    // означає, що middleware і сервіс розійшлися — краще відмовити.
+    if (reauth.method === 'password' && !input.password) {
+      throw new UnauthorizedError(
+        'Password re-authentication must include the password in the request body.',
       );
     }
 
@@ -113,7 +125,13 @@ export class StellarApiService {
     await this._repository.recordAuditLog({
       event: 'STELLAR_WALLET_UNLINKED',
       userId,
-      details: { previousPublicKey: wallet.publicKey, unlinkedAt: timestamp },
+      details: {
+        previousPublicKey: wallet.publicKey,
+        unlinkedAt: timestamp,
+        // Аудит має показувати, чим саме підтвердили дію (#1154).
+        reauthMethod: reauth.method,
+        reauthAt: reauth.at,
+      },
       timestamp,
     });
 

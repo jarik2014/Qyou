@@ -13,6 +13,10 @@ export class InMemoryAuthRepository implements AuthRepository {
     return this.usersByEmail.get(email) ?? null;
   }
 
+  async findById(id: string): Promise<AuthUserRecord | null> {
+    return [...this.usersByEmail.values()].find((u) => u.id === id) ?? null;
+  }
+
   async create(data: CreateUserData): Promise<AuthUserRecord> {
     const now = new Date();
     const record: AuthUserRecord = {

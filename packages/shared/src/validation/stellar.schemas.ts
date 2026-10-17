@@ -7,14 +7,14 @@ export const linkWalletSchema = z.object({
     .regex(/^G[A-Z2-7]{55}$/, 'publicKey must be a valid 56-character Stellar public key starting with G'),
 });
 
+// #1154: `reauthConfirmed` прибрано — прапорець у тілі запиту нічого не
+// доводив. Доказом re-auth тепер є або пароль (перевіряється проти хеша), або
+// свіжість access-токена; обидва перевіряє requireRecentAuth на сервері.
 export const unlinkWalletSchema = z
   .object({
-    password: z.string().min(1, 'password is required').optional(),
-    reauthConfirmed: z.boolean().optional(),
+    password: z.string().min(1, 'password must not be empty').optional(),
   })
-  .refine((data) => Boolean(data.password || data.reauthConfirmed), {
-    message: 'Re-authentication required: must provide password or reauth confirmation',
-  });
+  .strip();
 
 export const walletAccountSchema = z.object({
   userId: z.string().min(1),

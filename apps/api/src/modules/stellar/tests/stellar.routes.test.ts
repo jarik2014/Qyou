@@ -30,8 +30,11 @@ function createTestApp(stellarRepository: InMemoryStellarRepository, walletServi
   return app;
 }
 
-function makeToken(userId: string, email = 'user@example.com'): string {
-  return jwt.sign({ sub: userId, email }, process.env.JWT_SECRET || JWT_SECRET);
+function makeToken(userId: string, email = 'user@example.com', issuedSecondsAgo = 0): string {
+  const options = issuedSecondsAgo > 0
+    ? { iat: Math.floor(Date.now() / 1000) - issuedSecondsAgo }
+    : undefined;
+  return jwt.sign({ sub: userId, email }, process.env.JWT_SECRET || JWT_SECRET, options);
 }
 
 const VALID_KEY_1 = 'GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFTGOBDKR3GYWUM7AZTQU';
@@ -165,20 +168,40 @@ describe('Stellar Routes (#1006 - #1009)', () => {
   });
 
   describe('DELETE /api/stellar/wallet - Unlink Wallet with Re-authentication (#1009)', () => {
-    it('rejects unlinking when re-authentication is missing with 400 Validation Error', async () => {
-      const token = makeToken('user-4');
+    // #1154: замість «прапорця в тілі» сервер вимагає доказ — свіжий токен або пароль.
+    it('rejects unlinking on a stale session without a password', async () => {
+      const fresh = makeToken('user-4');
       await request(app)
         .post('/api/stellar/wallet')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${fresh}`)
         .send({ publicKey: VALID_KEY_1 });
 
+      const stale = makeToken('user-4', 'user@example.com', 60 * 60);
       const res = await request(app)
         .delete('/api/stellar/wallet')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${stale}`)
         .send({});
 
-      assert.equal(res.status, 400);
-      assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+      assert.equal(res.status, 401);
+      assert.equal(res.body.error.code, 'UNAUTHORIZED');
+      assert.match(res.body.error.message, /older than 10 minutes/);
+    });
+
+    it('ignores a client-sent reauthConfirmed flag', async () => {
+      const fresh = makeToken('user-4b');
+      await request(app)
+        .post('/api/stellar/wallet')
+        .set('Authorization', `Bearer ${fresh}`)
+        .send({ publicKey: VALID_KEY_1 });
+
+      const stale = makeToken('user-4b', 'user@example.com', 60 * 60);
+      const res = await request(app)
+        .delete('/api/stellar/wallet')
+        .set('Authorization', `Bearer ${stale}`)
+        .send({ reauthConfirmed: true });
+
+      assert.equal(res.status, 401);
+      assert.equal(res.body.error.code, 'UNAUTHORIZED');
     });
 
     it('successfully unlinks wallet and writes audit log on re-authentication (happy path)', async () => {
@@ -188,10 +211,11 @@ describe('Stellar Routes (#1006 - #1009)', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({ publicKey: VALID_KEY_1 });
 
+      // Свіжий токен — достатній доказ re-auth (#1154).
       const res = await request(app)
         .delete('/api/stellar/wallet')
         .set('Authorization', `Bearer ${token}`)
-        .send({ password: 'user-valid-password' });
+        .send({});
 
       assert.equal(res.status, 200);
       assert.equal(res.body.success, true);
@@ -208,6 +232,8 @@ describe('Stellar Routes (#1006 - #1009)', () => {
       assert.ok(unlinkLog);
       assert.equal(unlinkLog.userId, 'user-5');
       assert.equal(unlinkLog.details.previousPublicKey, VALID_KEY_1);
+      // #1154: аудит показує, чим саме підтвердили дію.
+      assert.equal(unlinkLog.details.reauthMethod, 'recent-auth');
     });
 
     it('returns 404 Not Found when trying to unlink non-existent wallet', async () => {
@@ -215,7 +241,7 @@ describe('Stellar Routes (#1006 - #1009)', () => {
       const res = await request(app)
         .delete('/api/stellar/wallet')
         .set('Authorization', `Bearer ${token}`)
-        .send({ reauthConfirmed: true });
+        .send({});
 
       assert.equal(res.status, 404);
       assert.equal(res.body.error.code, 'NOT_FOUND');

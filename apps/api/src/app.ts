@@ -7,6 +7,7 @@ import { PrismaAuthRepository } from './modules/auth/repositories/auth.repositor
 import type { AuthRepository } from './modules/auth/repositories/auth.repository.js';
 import { InMemoryAuthRepository } from './modules/auth/repositories/in-memory-auth.repository.js';
 import { createStellarRouter } from './modules/stellar/routes/stellar.routes.js';
+import { requireRecentAuth } from './shared/middleware/recent-auth.js';
 import type { StellarRepository } from './modules/stellar/repositories/stellar.repository.js';
 import { prisma } from './shared/database/prisma.js';
 import { errorHandler } from './shared/middleware/error-handler.js';
@@ -113,17 +114,20 @@ const openApiSpec = {
       },
       delete: {
         summary: 'Unlink a linked Stellar wallet with re-authentication',
+        description:
+          'Requires proof of re-authentication: either the account password (verified server-side) ' +
+          'or an access token issued within WALLET_UNLINK_REAUTH_MINUTES. A client-sent confirmation ' +
+          'flag is not accepted.',
         tags: ['Stellar'],
         security: [{ BearerAuth: [] }],
         requestBody: {
-          required: true,
+          required: false,
           content: {
             'application/json': {
               schema: {
                 type: 'object',
                 properties: {
-                  password: { type: 'string' },
-                  reauthConfirmed: { type: 'boolean' },
+                  password: { type: 'string', description: 'Account password, if the session is not recent.' },
                 },
               },
             },
@@ -131,7 +135,7 @@ const openApiSpec = {
         },
         responses: {
           200: { description: 'Wallet unlinked successfully' },
-          401: { description: 'Re-authentication required' },
+          401: { description: 'Re-authentication required (stale session without a valid password)' },
           404: { description: 'No wallet linked' },
         },
       },
@@ -231,6 +235,8 @@ export function createApp(deps: AppDependencies = {}): Express {
   if (stellarEnabled) {
     const stellarRouter = createStellarRouter({
       stellarRepository: deps.stellarRepository,
+      // #1154: відвʼязка гаманця вимагає доведеного re-auth на сервері.
+      unlinkReauth: requireRecentAuth({ authRepository }),
     });
     app.use('/api/v1/stellar', stellarRouter);
     app.use('/api/stellar', stellarRouter);

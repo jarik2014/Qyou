@@ -124,11 +124,11 @@ describe('Stellar Route Schema & DTO Contract Verification (#1046)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ publicKey: VALID_KEY });
 
-    // Unlink
+    // Unlink — токен щойно виданий, тож проходить як свіжий re-auth (#1154)
     const res = await request(app)
       .delete('/api/stellar/wallet')
       .set('Authorization', `Bearer ${token}`)
-      .send({ reauthConfirmed: true });
+      .send({});
 
     assert.equal(res.status, 200);
 

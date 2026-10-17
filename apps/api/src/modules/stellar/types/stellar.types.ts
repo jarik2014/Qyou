@@ -5,7 +5,9 @@ export interface LinkWalletInput {
 }
 
 export interface UnlinkWalletInput {
+  /** Перевіряється проти хешу в requireRecentAuth, не тут. */
   password?: string;
+  /** @deprecated #1154 — прапорець із тіла запиту нічого не доводить; ігнорується. */
   reauthConfirmed?: boolean;
 }
 

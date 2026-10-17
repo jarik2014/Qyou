@@ -3,6 +3,8 @@ import type { AuthUserRecord, CreateUserData } from '../types/auth.types.js';
 
 export interface AuthRepository {
   findByEmail(email: string): Promise<AuthUserRecord | null>;
+  /** Потрібен для re-auth дій на кшталт відвʼязки гаманця (#1154). */
+  findById(id: string): Promise<AuthUserRecord | null>;
   create(data: CreateUserData): Promise<AuthUserRecord>;
   deactivate(id: string): Promise<AuthUserRecord>;
 }
@@ -12,6 +14,10 @@ export class PrismaAuthRepository implements AuthRepository {
 
   async findByEmail(email: string): Promise<AuthUserRecord | null> {
     return this.prisma.user.findUnique({ where: { email } });
+  }
+
+  async findById(id: string): Promise<AuthUserRecord | null> {
+    return this.prisma.user.findUnique({ where: { id } });
   }
 
   async create(data: CreateUserData): Promise<AuthUserRecord> {

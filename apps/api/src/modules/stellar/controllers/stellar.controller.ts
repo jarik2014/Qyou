@@ -45,7 +45,7 @@ export class StellarController {
         throw new UnauthorizedError('Authentication required to unlink wallet.');
       }
       const input = unlinkWalletSchema.parse(req.body);
-      const result = await this.stellarService.unlinkWallet(req.user.id, input);
+      const result = await this.stellarService.unlinkWallet(req.user.id, input, req.reauth);
       res.status(200).json(result);
     } catch (error) {
       next(error);
